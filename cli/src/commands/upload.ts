@@ -46,7 +46,8 @@ export default class Upload extends BaseCommand {
 
     const uploadProgress = new cliProgress.SingleBar(
       {
-        format: '{bar} | {percentage}% | ETA: {eta_formatted} | {value_formatted}/{total_formatted}: {filename}',
+        format:
+          '{bar} | {percentage}% | ETA: {eta_formatted} | {value_formatted}/{total_formatted}: {currentAction} - {filename}',
       },
       cliProgress.Presets.shades_classic,
     );
@@ -76,6 +77,7 @@ export default class Upload extends BaseCommand {
       for (const asset of assetsToUpload) {
         uploadProgress.update({
           filename: asset.path,
+          currentAction: 'Prepare',
         });
 
         let skipUpload = false;
@@ -83,6 +85,7 @@ export default class Upload extends BaseCommand {
         let existingAssetId: string | undefined = undefined;
 
         if (!options.skipHash) {
+          uploadProgress.update({ currentAction: 'Checking Hash' });
           const assetBulkUploadCheckDto = { assets: [{ id: asset.path, checksum: await asset.hash() }] };
 
           const checkResponse = await this.immichApi.assetApi.checkBulkUpload({
@@ -100,11 +103,13 @@ export default class Upload extends BaseCommand {
         if (!skipAsset) {
           if (!options.dryRun) {
             if (!skipUpload) {
+              uploadProgress.update({ currentAction: 'Uploading' });
               const formData = asset.getUploadFormData();
               const res = await this.uploadAsset(formData);
               existingAssetId = res.data.id;
             }
             if ((options.albumName || options.album) && asset.albumName) {
+              uploadProgress.update({ currentAction: 'Adding to album' });
               let album = existingAlbums.find((album) => album.albumName === asset.albumName);
               if (!album) {
                 const res = await this.immichApi.albumApi.createAlbum({
